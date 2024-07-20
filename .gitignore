@@ -1,0 +1,33 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.rmarkdown
+
+# stop tracking apa.csl because the document types are self-contained for rendering
+apa.csl
+# stop tracking process folder because i never ended up using it
+PROCESS/
+# stop trackign .Rproj file
+*.Rproj
+# stop trackign references.yaml
+references.yaml
+
+# ignore .DS_Store
+.DS_Store
+
+# Data files not necessary for running code
+data/dyadic_data.csv
+data/dyadic_data_with_res_facial_dominance.csv
+data/individuals_data_with_fWHR.csv
+data/individuals_data_with_ratings.csv
+data/post_analysis_dyadic_data_full.csv
+data/post_analysis_dyadic_data_neutral_faces_only.csv
+data/post_analysis_individual_data_females_only.csv
+data/transposed_attractiveness_data.csv
+data/transposed_dominance_data.csv
+data/transposed_masculinityfemininity_data.csv
+data/data_after_study_1_analysis.csv
+
+# Notes on the preparation of data sets
+data/preparation_of_datasets.rtf
