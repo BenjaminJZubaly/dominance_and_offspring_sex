@@ -4657,6 +4657,388 @@ exp(.59) # +1 SD
 
     -   Again, it is possible that in the population there exists such an effect, whereas we simply do not have enough power to detect it.
 
+# Addressing Critiques from AHBP Reviewer
+
+## Testing for Differences Between Coupled and Individual Participants
+
+It is possible that participants who's partners completed the survey differ systematically from those whose partners who did not complete the study. To test this, we will run a number of different t tests to see if there are significant differences in characteristics between the partners.
+
+```{r}
+# Testing for differences in characteristics between those whose partners completed and those whose partners did not complete
+  # For age
+t.test(data = individualsdata, age ~ partner_completed, var.equal = FALSE)
+  # For SSS
+t.test(data = individualsdata, SSS ~ partner_completed, var.equal = FALSE)
+  # For SR_dom_cheng
+t.test(data = individualsdata, SR_dom_cheng ~ partner_completed, var.equal = FALSE)
+  # For SAT
+t.test(data = individualsdata, SAT ~ partner_completed, var.equal = FALSE)
+  # For IPIP_dom
+t.test(data = individualsdata, IPIP_dom ~ partner_completed, var.equal = FALSE)
+  # For facial_dominance
+t.test(data = individualsdata, facial_dominance ~ partner_completed, var.equal = FALSE)
+  # For facial_masculinityfemininity
+t.test(data = individualsdata, facial_masculinityfemininity ~ partner_completed, var.equal = FALSE)
+  # For facial_attractiveness
+t.test(data = individualsdata, facial_attractiveness ~ partner_completed, var.equal = FALSE)
+```
+
+## Controlling for Number of Children
+
+### Hypothesis 2: Facial Dominance Operationalization
+
+Now we will test the hypothesis with the standardized residuals for facial dominance that we created within sexes, while controlling `m_num_bio_child`. Because there are group differences in facial dominance between the neutral and non-neutral facial expression groups, we will conduct this analysis on both the full dyadic dataset and on the neutral faces only.
+
+#### Full Dataset
+
+Now we will fit our two models, one with the interaction term and one without (both with `m_num_bio_child` as a covariate).
+
+```{r}
+# Fitting the model with only the main effects of residual facial dominance for mothers and fathers
+res_fac_dom_main_effects_model_n <- glm(shared_child_sex ~ z_m_res_facial_dominance + z_f_res_facial_dominance + m_num_bio_child, family = binomial(link = logit), data = dyadic_data)
+
+# Fitting the model with the main effects of residual facial dominance for mothers and fathers as well as their interaction
+res_fac_dom_interaction_model_n <- glm(shared_child_sex ~ z_m_res_facial_dominance + z_f_res_facial_dominance + m_num_bio_child + z_m_res_facial_dominance:z_f_res_facial_dominance, family = binomial(link = logit), data = dyadic_data)
+```
+
+##### Assumptions
+
+Now we need to check our assumptions.
+
+1.  Dichotomous DV (satisfied)
+2.  One or more continuous IVs, continuous or nominal (satisfied)
+3.  Independence of observations (satisfied)
+4.  Categories of dichotomous DV and nominal IVs are mutually exclusive and exhaustive (satisfied)
+5.  No outliers: Will assess by plotting Cooks distance for each case in each models below (and identify the top 10 cases by number).
+
+```{r}
+# Plotting Cook's distance for the main effects model
+plot(res_fac_dom_main_effects_model_n, which = 4, id.n = 10)
+
+#Plotting Cook's distance for the interaction model
+plot(res_fac_dom_interaction_model_n, which = 4, id.n = 10)
+```
+
+-   We can see that none of the cases come close to the common threshold of 1.
+
+6.  No excessive multicollinearity: Will assess with VIF and tolerance statistics for the main effects model only because it cannot handle interactions.
+
+```{r}
+# VIF and tolerance for the main effects model
+vif(res_fac_dom_main_effects_model_n)
+1/vif(res_fac_dom_main_effects_model_n)
+```
+
+-   The VIF and tolerance statistics are well within the reasonable range.
+
+7.  Linear relationship between continuous IVs and logit of DV: Box-Tidwell Approach
+
+-   We need to create the natural log transformations of each of the continuous IVs, but because the ln of a negative number is undefined we must first transform our predictor variables to all be positive by adding a constant. The below code determines the lowest value of `z_m_res_facial_dominance` and `z_f_res_facial_dominance` so that we can add a constant that makes all values for the variable positive before making the natural log transformation.
+
+```{r}
+min(dyadic_data$z_m_res_facial_dominance)
+min(dyadic_data$z_f_res_facial_dominance, na.rm = TRUE) # Because there is one NA value in the father data we specify that the algorithm should ignore this value
+```
+
+-   Given these minimum values, I will add 4 to each variable to make them positive, then I will make a natural log transformation to both.
+
+```{r}
+# Creating c_z_m_res_facial_dominance, which represents mothers' residual facial dominance after adding a constant of 4
+dyadic_data$c_z_m_res_facial_dominance <- dyadic_data$z_m_res_facial_dominance + 4
+
+# Creating ln_c_z_m_res_facial_dominance, which represents the natural log of mothers' residual facial dominance after adding a constant of 4
+dyadic_data$ln_c_z_m_res_facial_dominance <- log(dyadic_data$c_z_m_res_facial_dominance)
+
+# Creating c_z_f_res_facial_dominance, which represents fathers' residual facial dominance after adding a constant of 4
+dyadic_data$c_z_f_res_facial_dominance <- dyadic_data$z_f_res_facial_dominance + 4
+
+# Creating ln_c_z_f_res_facial_dominance, which represents the natural log of fathers' residual facial dominance after adding a constant of 4
+dyadic_data$ln_c_z_f_res_facial_dominance <- log(dyadic_data$c_z_f_res_facial_dominance)
+```
+
+-   Through manually doing the transformations for a couple numbers, I believe that this transformation was done correctly.
+
+-   Now we need to fit and summarize a model with the main effects of each variable with the constant transformation plus the interaction of those variables with their natural log transformations. The summary should indicate that neither of the interaction terms are significant, thereby satisfying the assumption of linearity of the logit.
+
+```{r}
+BT_test_res_facial_dom_model <- glm(shared_child_sex ~ c_z_m_res_facial_dominance + c_z_f_res_facial_dominance + c_z_m_res_facial_dominance:ln_c_z_m_res_facial_dominance +  c_z_f_res_facial_dominance:ln_c_z_f_res_facial_dominance, family = binomial(link = logit), data = dyadic_data)
+
+summary(BT_test_res_facial_dom_model)
+```
+
+-   Neither of the interaction terms are significant, indicating that we should not reject the null hypothesis that there is a linear relationship between our continuous predictors and the logit.
+
+##### Summary of the Models
+
+First, here is the summary of the model with the main effects of mothers' residual facial dominance and fathers' residual facial dominance only, along with a Chi-square test for whether the model with the main effects fits significantly better than the model with only the intercept.
+
+```{r}
+# Producing the summary of the main effects model
+summary(res_fac_dom_main_effects_model_n)
+
+# Calculating the chi-squared statistic for the model compared to the baseline model with only the intercept
+Chi_res_fac_dom_main_effects_model_n <- res_fac_dom_main_effects_model_n$null.deviance - res_fac_dom_main_effects_model_n$deviance
+Chi_res_fac_dom_main_effects_model_n
+
+# Calculating the degrees of freedom for the chi-square statistic comparing the model to it's baseline
+df_res_fac_dom_main_effects_model_n <- res_fac_dom_main_effects_model_n$df.null - res_fac_dom_main_effects_model_n$df.residual
+df_res_fac_dom_main_effects_model_n
+
+# Conducting a chi-square test for the p-value using the chi-square statistic and the degrees of freedom
+prob_Chi_res_fac_dom_main_effects_model_n <- 1 - pchisq(Chi_res_fac_dom_main_effects_model_n, df_res_fac_dom_main_effects_model_n)
+prob_Chi_res_fac_dom_main_effects_model_n
+```
+
+-   Results here are virtually identical.
+
+```{r}
+# Exponentiating the coefficients of the model to reveal the odds ratio conversion of the coefficients
+exp(res_fac_dom_main_effects_model_n$coefficients)
+```
+
+Now we will summarize the model with the main effects and their interaction, and we will compare it's fit to the intercept only model. After this we will compare it to the main effects model.
+
+```{r}
+# Summarizing the interaction model
+summary(res_fac_dom_interaction_model_n)
+
+# Calculating the chi-squared statistic for the model compared to the baseline model with only the intercept
+Chi_res_fac_dom_interaction_model_n <- res_fac_dom_interaction_model_n$null.deviance - res_fac_dom_interaction_model_n$deviance
+Chi_res_fac_dom_interaction_model_n
+
+# Calculating the degrees of freedom for the chi-square statistic comparing the model to it's baseline
+df_res_fac_dom_interaction_model_n <- res_fac_dom_interaction_model_n$df.null - res_fac_dom_interaction_model_n$df.residual
+df_res_fac_dom_interaction_model_n
+
+# Conducting a chi-square test for the p-value using the chi-square statistic and the degrees of freedom
+prob_Chi_res_fac_dom_interaction_model_n <- 1 - pchisq(Chi_res_fac_dom_interaction_model_n, df_res_fac_dom_interaction_model_n)
+prob_Chi_res_fac_dom_interaction_model_n
+```
+
+-   Results here are virtually identical.
+
+```{r}
+# Exponentiating the coefficients of the model to reveal the odds ratio conversion of the coefficients
+exp(res_fac_dom_interaction_model_n$coefficients)
+```
+
+Because the whole interaction model is not significant compared to the intercept-only model, it would be very surprising if the interaction model would fit better than the main-effects only model, but I will go ahead and do the comparison anyways.
+
+```{r}
+# Calculating the chi-square statistic to compare the interaction model with the main effects model
+Chi_res_fac_dom_interaction_model_n_v_main <- res_fac_dom_main_effects_model_n$deviance - res_fac_dom_interaction_model_n$deviance
+Chi_res_fac_dom_interaction_model_n_v_main
+
+# Calculating the degrees of freedom to compare the interaction model with the main effects model
+df_res_fac_dom_interaction_model_n_v_main <- res_fac_dom_main_effects_model_n$df.residual - res_fac_dom_interaction_model_n$df.residual
+df_res_fac_dom_interaction_model_n_v_main
+
+prob_Chi_res_fac_dom_interaction_model_n_v_main <- 1 - pchisq(Chi_res_fac_dom_interaction_model_n_v_main, df_res_fac_dom_interaction_model_n_v_main)
+prob_Chi_res_fac_dom_interaction_model_n_v_main
+```
+
+Although the interaction is not significant in our model, our hypothesis predicts that at high levels of fathers' facial dominance mothers' dominance predicts the probability of a first born son, so I will run a simple slopes and Johnson-Neyman analysis with mothers' residual facial dominance as the focal predictor and fathers' residual facial dominance as the moderator.
+
+```{r}
+# Conducting the simple slopes and Johnson-Neyman analysis
+sim_slopes(res_fac_dom_interaction_model_n, pred = z_m_res_facial_dominance, modx = z_f_res_facial_dominance, jnplot = TRUE)
+```
+
+-   Although nothing here is significant, I will exponentiate the coefficients here to make them more interpretable.
+
+```{r}
+# Producing odds-ratios for each value of the slope for mothers' residual facial dominance for each level of the moderator in the simple slopes analysis
+exp(-.31) # -1 SD
+exp(.10) # Mean
+exp(.51) # +1 SD
+```
+
+```{r}
+# Taking the inverse of the odds-ratio for the first coefficient
+1 - 0.733447
+```
+
+-   Results here are virtually identical.
+
+#### Neutral Faces Only
+
+Now we will repeat the same analysis as just above but with the neutral faces only.
+
+First, we will standardize our independent variables in the new data frame, `m_res_facial_dominance` and `f_res_facial_dominance`.
+
+```{r}
+# Standardizing the m_res_facial_dominance and f_res_facial_dominance variables as z_m_res_facial_dominance and z_f_res_facial_dominance (because the mean and SD may be slightly different in this new data frame)
+neutral_face_dyadic_data$z_m_res_facial_dominance <- scale(neutral_face_dyadic_data$m_res_facial_dominance, center = TRUE, scale = TRUE)
+neutral_face_dyadic_data$z_f_res_facial_dominance <- scale(neutral_face_dyadic_data$f_res_facial_dominance, center = TRUE, scale = TRUE)
+```
+
+Now we will fit our two models, one with the interaction term and one without.
+
+```{r}
+# Fitting the model with only the main effects of residual facial dominance for mothers and fathers
+res_fac_dom_main_effects_model_n_neutral <- glm(shared_child_sex ~ z_m_res_facial_dominance + z_f_res_facial_dominance + m_num_bio_child, family = binomial(link = logit), data = neutral_face_dyadic_data)
+
+# Fitting the model with the main effects of residual facial dominance for mothers and fathers as well as their interaction
+res_fac_dom_interaction_model_n_neutral <- glm(shared_child_sex ~ z_m_res_facial_dominance + z_f_res_facial_dominance + m_num_bio_child + z_m_res_facial_dominance:z_f_res_facial_dominance, family = binomial(link = logit), data = neutral_face_dyadic_data)
+```
+
+##### Assumptions
+
+Now we need to check our assumptions.
+
+1.  Dichotomous DV (satisfied)
+2.  One or more continuous IVs, continuous or nominal (satisfied)
+3.  Independence of observations (satisfied)
+4.  Categories of dichotomous DV and nominal IVs are mutually exclusive and exhaustive (satisfied)
+5.  No outliers: Will assess by plotting Cooks distance for each case in each models below (and identify the top 10 cases by number).
+
+```{r}
+# Plotting Cook's distance for the main effects model
+plot(res_fac_dom_main_effects_model_n_neutral, which = 4, id.n = 10)
+
+#Plotting Cook's distance for the interaction model
+plot(res_fac_dom_interaction_model_n_neutral, which = 4, id.n = 10)
+```
+
+-   We can see that none of the cases come close to the common threshold of 1.
+
+6.  No excessive multicollinearity: Will assess with VIF and tolerance statistics for the main effects model only because it cannot handle interactions.
+
+```{r}
+# VIF and tolerance for the main effects model
+vif(res_fac_dom_main_effects_model_n_neutral)
+1/vif(res_fac_dom_main_effects_model_n_neutral)
+```
+
+-   The VIF and tolerance statistics are well within the reasonable range.
+
+7.  Linear relationship between continuous IVs and logit of DV: Box-Tidwell Approach
+
+-   We need to create the natural log transformations of each of the continuous IVs, but because the ln of a negative number is undefined we must first transform our predictor variables to all be positive by adding a constant. The below code determines the lowest value of `z_m_res_facial_dominance` and `z_f_res_facial_dominance` so that we can add a constant that makes all values for the variable positive before making the natural log transformation.
+
+```{r}
+min(neutral_face_dyadic_data$z_m_res_facial_dominance)
+min(neutral_face_dyadic_data$z_f_res_facial_dominance)
+```
+
+-   Given these minimum values, I will add 3 to each variable to make them positive, then I will make a natural log transformation to both.
+
+```{r}
+# Creating c_z_m_res_facial_dominance, which represents mothers' residual facial dominance after adding a constant of 3
+neutral_face_dyadic_data$c_z_m_res_facial_dominance <- neutral_face_dyadic_data$z_m_res_facial_dominance + 3
+
+# Creating ln_c_z_m_res_facial_dominance, which represents the natural log of mothers' residual facial dominance after adding a constant of 3
+neutral_face_dyadic_data$ln_c_z_m_res_facial_dominance <- log(neutral_face_dyadic_data$c_z_m_res_facial_dominance)
+
+# Creating c_z_f_res_facial_dominance, which represents fathers' residual facial dominance after adding a constant of 3
+neutral_face_dyadic_data$c_z_f_res_facial_dominance <- neutral_face_dyadic_data$z_f_res_facial_dominance + 3
+
+# Creating ln_c_z_f_res_facial_dominance, which represents the natural log of fathers' residual facial dominance after adding a constant of 3
+neutral_face_dyadic_data$ln_c_z_f_res_facial_dominance <- log(neutral_face_dyadic_data$c_z_f_res_facial_dominance)
+```
+
+-   Now we need to fit and summarize a model with the main effects of each variable with the constant transformation plus the interaction of those variables with their natural log transformations. The summary should indicate that neither of the interaction terms are significant, thereby satisfying the assumption of linearity of the logit.
+
+```{r}
+BT_test_res_facial_dom_model_neutral <- glm(shared_child_sex ~ c_z_m_res_facial_dominance + c_z_f_res_facial_dominance + c_z_m_res_facial_dominance:ln_c_z_m_res_facial_dominance +  c_z_f_res_facial_dominance:ln_c_z_f_res_facial_dominance, family = binomial(link = logit), data = neutral_face_dyadic_data)
+
+summary(BT_test_res_facial_dom_model_neutral)
+```
+
+-   Neither of the interaction terms are significant, indicating that we should not reject the null hypothesis that there is a linear relationship between our continuous predictors and the logit.
+
+##### Summary of the Models
+
+First, here is the summary of the model with the main effects of mothers' residual facial dominance and fathers' residual facial dominance only, along with a Chi-square test for whether the model with the main effects fits significantly better than the model with only the intercept.
+
+```{r}
+# Producing the summary of the main effects model
+summary(res_fac_dom_main_effects_model_n_neutral)
+
+# Calculating the chi-squared statistic for the model compared to the baseline model with only the intercept
+Chi_res_fac_dom_main_effects_model_n_neutral <- res_fac_dom_main_effects_model_n_neutral$null.deviance - res_fac_dom_main_effects_model_n_neutral$deviance
+Chi_res_fac_dom_main_effects_model_n_neutral
+
+# Calculating the degrees of freedom for the chi-square statistic comparing the model to it's baseline
+df_res_fac_dom_main_effects_model_n_neutral <- res_fac_dom_main_effects_model_n_neutral$df.null - res_fac_dom_main_effects_model_n_neutral$df.residual
+df_res_fac_dom_main_effects_model_n_neutral
+
+# Conducting a chi-square test for the p-value using the chi-square statistic and the degrees of freedom
+prob_Chi_res_fac_dom_main_effects_model_n_neutral <- 1 - pchisq(Chi_res_fac_dom_main_effects_model_n_neutral, df_res_fac_dom_main_effects_model_n_neutral)
+prob_Chi_res_fac_dom_main_effects_model_n_neutral
+```
+
+-   Results here are virtually identical.
+
+```{r}
+# Exponentiating the coefficients of the model to reveal the odds ratio conversion of the coefficients
+exp(res_fac_dom_main_effects_model_n_neutral$coefficients)
+```
+
+Now we will summarize the model with the main effects and their interaction, and we will compare it's fit to the intercept only model. After this we will compare it to the main effects model.
+
+```{r}
+# Summarizing the interaction model
+summary(res_fac_dom_interaction_model_n_neutral)
+
+# Calculating the chi-squared statistic for the model compared to the baseline model with only the intercept
+Chi_res_fac_dom_interaction_model_n_neutral <- res_fac_dom_interaction_model_n_neutral$null.deviance - res_fac_dom_interaction_model_n_neutral$deviance
+Chi_res_fac_dom_interaction_model_n_neutral
+
+# Calculating the degrees of freedom for the chi-square statistic comparing the model to it's baseline
+df_res_fac_dom_interaction_model_n_neutral <- res_fac_dom_interaction_model_n_neutral$df.null - res_fac_dom_interaction_model_n_neutral$df.residual
+df_res_fac_dom_interaction_model_n_neutral
+
+# Conducting a chi-square test for the p-value using the chi-square statistic and the degrees of freedom
+prob_Chi_res_fac_dom_interaction_model_n_neutral <- 1 - pchisq(Chi_res_fac_dom_interaction_model_n_neutral, df_res_fac_dom_interaction_model_n_neutral)
+prob_Chi_res_fac_dom_interaction_model_n_neutral
+```
+
+-   Results here are virtually identical.
+
+```{r}
+# Exponentiating the coefficients of the model to reveal the odds ratio conversion of the coefficients
+exp(res_fac_dom_interaction_model_n_neutral$coefficients)
+```
+
+Now to compare the main-effects model with the main-effects and interaction model.
+
+```{r}
+# Calculating the chi-square statistic to compare the interaction model with the main effects model
+Chi_res_fac_dom_interaction_model_n_v_main_neutral <- res_fac_dom_main_effects_model_n_neutral$deviance - res_fac_dom_interaction_model_n_neutral$deviance
+Chi_res_fac_dom_interaction_model_n_v_main_neutral
+
+# Calculating the degrees of freedom to compare the interaction model with the main effects model
+df_res_fac_dom_interaction_model_n_v_main_neutral <- res_fac_dom_main_effects_model_n_neutral$df.residual - res_fac_dom_interaction_model_n_neutral$df.residual
+df_res_fac_dom_interaction_model_n_v_main_neutral
+
+prob_Chi_res_fac_dom_interaction_model_n_v_main_neutral <- 1 - pchisq(Chi_res_fac_dom_interaction_model_n_v_main_neutral, df_res_fac_dom_interaction_model_n_v_main_neutral)
+prob_Chi_res_fac_dom_interaction_model_n_v_main_neutral
+```
+
+Although the interaction is not significant in our model, our hypothesis predicts that at high levels of fathers' facial dominance mothers' dominance predicts the probability of a first born son, so I will run a simple slopes and Johnson-Neyman analysis with mothers' residual facial dominance as the focal predictor and fathers' residual facial dominance as the moderator.
+
+```{r}
+# Conducting the simple slopes and Johnson-Neyman analysis
+sim_slopes(res_fac_dom_interaction_model_n_neutral, pred = z_m_res_facial_dominance, modx = z_f_res_facial_dominance, jnplot = TRUE)
+```
+
+-   Although nothing here is significant, I will exponentiate the coefficients here to make them more interpretable.
+
+```{r}
+# Producing odds-ratios for each value of the slope for mothers' residual facial dominance for each level of the moderator in the simple slopes analysis
+exp(-.08) # -1 SD
+exp(.25) # Mean
+exp(.57) # +1 SD
+```
+
+```{r}
+# Taking the inverse of the odds-ratio for the first coefficient
+1 - 0.9231163
+```
+
+-   Results here are virtually identical.
+
 ## Clean-Up From Study 2 Analysis
 
 I will now write the final versions of the analysis files that I have used as csv files so that they are not lost.
